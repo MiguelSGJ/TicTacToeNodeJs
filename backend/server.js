@@ -1,11 +1,10 @@
-import express from 'express'
-import { app } from './app.js'
-import { dotenv } from 'dotenv'
+import { app } from "./app.js";
+import { config } from "dotenv";
 
-dotenv.config();
+config();
 
 const port = process.env.SERVER_PORT || 3000;
 
 app.listen(port, () => {
-    console.log(`Servidor rodando na porta`, $port);
-})
+  console.log(`Servidor rodando na porta ${port}`);
+});

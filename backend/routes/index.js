@@ -1,8 +1,8 @@
-import express from 'express'
-import gameRoutes from './gameR'
+import express from "express";
+import gameRouter from "./gameR.js";
 
 const router = express.Router();
 
-router.use('/game', gameRoutes);
+router.use("/api", gameRouter);
 
 export default router;

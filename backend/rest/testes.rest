@@ -1,0 +1,7 @@
+### ✅ Criar um jogo
+GET  http://localhost:3000/api/
+
+###
+
+### 📋 Finalizar um jogo
+GET http://localhost:3000/api/endgame
