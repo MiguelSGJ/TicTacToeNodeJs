@@ -1,33 +1,64 @@
 // controllers/gameController.js
 import Board from "../model/boardModel.js";
+import User from "../model/userModel.js";
+
+const Game = Board;
 
 // Função para criar um novo jogo
 export async function createGame(req, res) {
-  try {
-    const game = await Board.create({});
-    const id = game._id;
+  const { phoneNumber } = req.params;
 
-    console.log(`Jogo iniciado ${id}`);
-    res.status(201).json({
-      success: true,
-      message: "Game initiated",
-      id,
-    }); // Retorna o jogo criado com status 201
+  try {
+    // Busca usuário pelo telefone (ou cria um novo)
+    let user = await User.findOne({
+      phoneNumber,
+    });
+    if (!user) {
+      user = new User({ phoneNumber, name: "Teste" });
+      await user.save();
+    }
+
+    const existingGame = await Game.findOne({
+      player: user._id,
+      status: "playing",
+    });
+    if (existingGame) {
+      res.status(400).json({
+        message: "Player already in a game!",
+        gameId: existingGame._id,
+      });
+    }
+
+    // Cria novo jogo vinculado ao usuário
+    const game = new Game({ player: user._id });
+    await game.save();
+
+    res.status(201).json({ success: true, gameId: game._id, userId: user._id });
   } catch (error) {
-    res.status(500).json({ message: "Error creating game" }); // Erro no servidor
-    console.log(error);
+    res.status(500).json({ message: error.message });
   }
 }
 
 // Função para buscar um jogo pelo ID
-export async function getGameById(req, res) {
-  const { id } = req.params;
+export async function getGameByPlayerNumber(req, res) {
+  const { playerNumber } = req.params; // ou req.query ou req.body dependendo da rota
+
   try {
-    const game = await Board.findById(id);
-    if (!game) {
-      return res.status(404).json({ message: "Game not found" });
+    const user = await User.findOne({ phoneNumber: playerNumber });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
-    res.json(game); // Retorna o jogo encontrado
+
+    // Busca o jogo ativo desse usuário
+    const game = await Board.findOne({ player: user._id, status: "playing" });
+    if (!game) {
+      return res
+        .status(404)
+        .json({ message: "No active game found for this user" });
+    }
+
+    // Retorna o jogo encontrado
+    res.json(game);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -35,15 +66,29 @@ export async function getGameById(req, res) {
 
 // Função para encerrar o jogo
 export async function endGame(req, res) {
-  const { id } = req.params;
+  const { playerNumber } = req.params;
   try {
-    const game = await Board.findById(id);
+    // Busca usuário pelo telefone
+    const user = await User.findOne({ phoneNumber: playerNumber });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Busca jogo ativo desse usuário
+    const game = await Board.findOne({ player: user._id, status: "playing" });
     if (!game) {
-      return res.status(404).json({ message: "Game not found" });
+      return res
+        .status(404)
+        .json({ message: "There's no active game for this user" });
+    }
+
+    // Verifica se o jogo já está finalizado
+    if (game.status !== "playing") {
+      return res.status(400).json({ message: "Game is already over" });
     }
 
     game.status = "finished"; // Atualiza o status para 'finished'
-    game.winner = "None"; // Empate
+    game.winner = null; // Empate
     await game.save();
     res.json({ message: "Game Over", game });
   } catch (error) {
@@ -55,14 +100,21 @@ export async function endGame(req, res) {
 
 // Função para realizar a jogada
 export async function makeMove(req, res) {
-  const { id } = req.params;
-  const { number } = req.body; // Número da posição e jogador
+  const { number, playerNumber } = req.body; // posição da jogada e telefone do usuário
 
   try {
-    // Busca o jogo
-    const game = await Board.findById(id);
+    // Busca usuário pelo telefone
+    const user = await User.findOne({ phoneNumber: playerNumber });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Busca jogo ativo desse usuário
+    const game = await Board.findOne({ player: user._id, status: "playing" });
     if (!game) {
-      return res.status(404).json({ message: "Game not found" });
+      return res
+        .status(404)
+        .json({ message: "There's no active game for this user" });
     }
 
     // Verifica se o jogo já está finalizado
@@ -70,8 +122,8 @@ export async function makeMove(req, res) {
       return res.status(400).json({ message: "Game is already over" });
     }
 
-    // Verifica se é o turno correto
-    if (game.currentPlayer !== player) {
+    // Verifica se é o turno do jogador (X)
+    if (game.currentPlayer !== "X") {
       return res.status(400).json({ message: "Not your turn" });
     }
 
@@ -83,41 +135,76 @@ export async function makeMove(req, res) {
       return res.status(400).json({ message: "Invalid move!" });
     }
 
-    // Realiza a jogada
-    game.board[row][col] = player;
+    // Jogador humano joga
+    game.board[row][col] = "X";
 
-    // Verifica vencedor ou empate
-    const winner = checkWinner(game.board);
+    // Verifica vitória ou empate após jogada do jogador
+    let winner = checkWinner(game.board);
     if (winner) {
       game.winner = winner;
       game.status = "finished";
-    } else if (checkDraw(game.board)) {
+      await game.save();
+      return res.json({ message: "Você venceu!", game });
+    }
+    if (checkDraw(game.board)) {
       game.status = "finished";
-    } else {
-      // Alterna o turno para o próximo jogador
-      game.currentPlayer = player === "X" ? "O" : "X";
-      // O sistema joga automaticamente o turno do próximo jogador
-      systemPlay(game); // Função para o sistema jogar automaticamente
+      await game.save();
+      return res.json({ message: "Empate!", game });
     }
 
+    // Turno para o sistema jogar (O)
+    game.currentPlayer = "O";
+
+    // Sistema joga automaticamente
+    systemPlay(game);
+
+    // Verifica vitória ou empate após jogada do sistema
+    winner = checkWinner(game.board);
+    if (winner) {
+      game.winner = winner;
+      game.status = "finished";
+      await game.save();
+      return res.json({ message: "Sistema venceu!", game });
+    }
+    if (checkDraw(game.board)) {
+      game.status = "finished";
+      await game.save();
+      return res.json({ message: "Empate!", game });
+    }
+
+    // Volta o turno para o jogador humano
+    game.currentPlayer = "X";
+
     await game.save();
-    res.json(game._id, game.board); // Retorna o estado atualizado do jogo
+
+    // Responde com o estado atualizado do jogo
+    res.json({ message: "Jogada realizada!", game });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 }
 
-// Função para alternar a jogada do sistema (IA simples)
 function systemPlay(game) {
+  // Lista todas as posições vazias
+  const emptyPositions = [];
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       if (game.board[row][col] === "") {
-        game.board[row][col] = game.currentPlayer === "X" ? "O" : "X"; // Alterna o jogador
-        game.currentPlayer = game.currentPlayer === "X" ? "O" : "X"; // Alterna o turno
-        return;
+        emptyPositions.push({ row, col });
       }
     }
   }
+
+  if (emptyPositions.length === 0) {
+    return; // Tabuleiro cheio, não tem jogada possível
+  }
+
+  // Escolhe uma posição aleatória entre as vazias
+  const randomIndex = Math.floor(Math.random() * emptyPositions.length);
+  const { row, col } = emptyPositions[randomIndex];
+
+  // Faz a jogada do sistema como 'O'
+  game.board[row][col] = "O";
 }
 
 // Função para verificar vencedor

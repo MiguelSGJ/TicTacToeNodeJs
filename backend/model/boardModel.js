@@ -35,6 +35,11 @@ const boardSchema = mongoose.Schema(
             type: "String",
             enum: ['X', 'O', null],
             default: null
+        },
+        player: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
         }
     },
     {
