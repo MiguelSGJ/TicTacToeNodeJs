@@ -1,7 +1,10 @@
 import mongoose from "mongoose";
 import { customAlphabet } from "nanoid";
+import { config } from "dotenv";
 
+config();
 const nanoId = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 8)
+const base64String = process.env.BASE64_BOARD_IMAGE
 
 const boardSchema = mongoose.Schema(
     {
@@ -40,6 +43,10 @@ const boardSchema = mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true
+        },
+        image: {
+            type: String, // Base 64 da imagem
+            default: base64String
         }
     },
     {

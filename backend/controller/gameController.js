@@ -1,6 +1,7 @@
 // controllers/gameController.js
 import Board from "../model/boardModel.js";
 import User from "../model/userModel.js";
+import { generateBoardImage } from "./utils/base64Encoder.js";
 
 const Game = Board;
 
@@ -26,6 +27,7 @@ export async function createGame(req, res) {
       res.status(400).json({
         message: "Player already in a game!",
         gameId: existingGame._id,
+        gameBoardImage: existingGame.image
       });
     }
 
@@ -33,7 +35,7 @@ export async function createGame(req, res) {
     const game = new Game({ player: user._id });
     await game.save();
 
-    res.status(201).json({ success: true, gameId: game._id, userId: user._id });
+    res.status(201).json({ success: true, gameId: game._id, userId: user._id, gameBoardImage: game.image });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -143,42 +145,42 @@ export async function makeMove(req, res) {
     if (winner) {
       game.winner = winner;
       game.status = "finished";
-      await game.save();
-      return res.json({ message: "Você venceu!", game });
-    }
-    if (checkDraw(game.board)) {
+    }else if (checkDraw(game.board)) {
       game.status = "finished";
-      await game.save();
-      return res.json({ message: "Empate!", game });
+    }else {
+
+      // Turno para o sistema jogar (O)
+      game.currentPlayer = "O";
+
+      // Sistema joga automaticamente
+      systemPlay(game);
+
+      // Verifica vitória ou empate após jogada do sistema
+      winner = checkWinner(game.board);
+      if (winner) {
+        game.winner = winner;
+        game.status = "finished";
+      }else if (checkDraw(game.board)) {
+        game.status = "finished";
+      }else {
+        // Volta o turno para o jogador humano
+        game.currentPlayer = "X";
+      }
     }
 
-    // Turno para o sistema jogar (O)
-    game.currentPlayer = "O";
-
-    // Sistema joga automaticamente
-    systemPlay(game);
-
-    // Verifica vitória ou empate após jogada do sistema
-    winner = checkWinner(game.board);
-    if (winner) {
-      game.winner = winner;
-      game.status = "finished";
-      await game.save();
-      return res.json({ message: "Sistema venceu!", game });
-    }
-    if (checkDraw(game.board)) {
-      game.status = "finished";
-      await game.save();
-      return res.json({ message: "Empate!", game });
-    }
-
-    // Volta o turno para o jogador humano
-    game.currentPlayer = "X";
+    game.image = await generateBoardImage(game.image, game.board);
 
     await game.save();
 
-    // Responde com o estado atualizado do jogo
-    res.json({ message: "Jogada realizada!", game });
+    // Responde com o jogo atualizado e imagem
+    res.json({
+      message: winner
+        ? (winner === "X" ? "Você venceu!" : "Sistema venceu!")
+        : game.status === "finished"
+        ? "Empate!"
+        : "Jogada realizada!",
+      game
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
