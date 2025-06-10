@@ -24,10 +24,10 @@ export async function createGame(req, res) {
       status: "playing",
     });
     if (existingGame) {
-      res.status(400).json({
-        message: "Player already in a game!",
+      return res.status(400).json({
+        message: "Jogador ja esta em um jogo!",
         gameId: existingGame._id,
-        gameBoardImage: existingGame.image
+        gameBoardImage: existingGame.image,
       });
     }
 
@@ -35,7 +35,14 @@ export async function createGame(req, res) {
     const game = new Game({ player: user._id });
     await game.save();
 
-    res.status(201).json({ success: true, gameId: game._id, userId: user._id, gameBoardImage: game.image });
+    res
+      .status(201)
+      .json({
+        success: true,
+        gameId: game._id,
+        userId: user._id,
+        gameBoardImage: game.image,
+      });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -104,6 +111,21 @@ export async function endGame(req, res) {
 export async function makeMove(req, res) {
   const { number, playerNumber } = req.body; // posição da jogada e telefone do usuário
 
+  // 1) validação mínima do número
+  if (typeof number !== "number" || isNaN(number)) {
+    return res
+      .status(400)
+      .json({ message: "Campo `number` é obrigatório e deve ser um número." });
+  }
+
+  let row, col;
+  try {
+    // 2) tenta converter, mas se for inválido, pega o erro e devolve 400
+    ({ row, col } = numberToPosition(number));
+  } catch (err) {
+    return res.status(400).json({ message: err.message });
+  }
+
   try {
     // Busca usuário pelo telefone
     const user = await User.findOne({ phoneNumber: playerNumber });
@@ -129,9 +151,6 @@ export async function makeMove(req, res) {
       return res.status(400).json({ message: "Not your turn" });
     }
 
-    // Converte o número da posição para linha e coluna
-    const { row, col } = numberToPosition(number);
-
     // Verifica se a casa está ocupada
     if (game.board[row][col] !== "") {
       return res.status(400).json({ message: "Invalid move!" });
@@ -145,10 +164,9 @@ export async function makeMove(req, res) {
     if (winner) {
       game.winner = winner;
       game.status = "finished";
-    }else if (checkDraw(game.board)) {
+    } else if (checkDraw(game.board)) {
       game.status = "finished";
-    }else {
-
+    } else {
       // Turno para o sistema jogar (O)
       game.currentPlayer = "O";
 
@@ -160,9 +178,9 @@ export async function makeMove(req, res) {
       if (winner) {
         game.winner = winner;
         game.status = "finished";
-      }else if (checkDraw(game.board)) {
+      } else if (checkDraw(game.board)) {
         game.status = "finished";
-      }else {
+      } else {
         // Volta o turno para o jogador humano
         game.currentPlayer = "X";
       }
@@ -175,11 +193,13 @@ export async function makeMove(req, res) {
     // Responde com o jogo atualizado e imagem
     res.json({
       message: winner
-        ? (winner === "X" ? "Você venceu!" : "Sistema venceu!")
+        ? winner === "X"
+          ? "Você venceu!"
+          : "Sistema venceu!"
         : game.status === "finished"
         ? "Empate!"
         : "Jogada realizada!",
-      game
+      game,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -10,7 +10,7 @@ const gameRouter = express.Router();
 
 gameRouter.post("/startgame/:phoneNumber", createGame);
 gameRouter.post("/move", makeMove);
-gameRouter.post("/endgame/:playerNumber", endGame);
+// gameRouter.post("/endgame/:playerNumber", endGame);
 gameRouter.get("/getgame/:playerNumber", getGameByPlayerNumber);
 
 export default gameRouter;
