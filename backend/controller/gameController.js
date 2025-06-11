@@ -27,6 +27,7 @@ export async function createGame(req, res) {
       return res.status(400).json({
         message: "Jogador ja esta em um jogo!",
         gameId: existingGame._id,
+        board: existingGame.board,
         gameBoardImage: existingGame.image,
       });
     }
@@ -35,22 +36,21 @@ export async function createGame(req, res) {
     const game = new Game({ player: user._id });
     await game.save();
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        gameId: game._id,
-        userId: user._id,
-        gameBoardImage: game.image,
-      });
+    res.status(201).json({
+      success: true,
+      gameId: game._id,
+      board: game.board,
+      userId: user._id,
+      gameBoardImage: game.image,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 }
 
-// Função para buscar um jogo pelo ID
+// Função para buscar um jogo pelo numero do telefone
 export async function getGameByPlayerNumber(req, res) {
-  const { playerNumber } = req.params; // ou req.query ou req.body dependendo da rota
+  const { playerNumber } = req.params;
 
   try {
     const user = await User.findOne({ phoneNumber: playerNumber });
@@ -59,7 +59,7 @@ export async function getGameByPlayerNumber(req, res) {
     }
 
     // Busca o jogo ativo desse usuário
-    const game = await Board.findOne({ player: user._id, status: "playing" });
+    const game = await Game.findOne({ player: user._id, status: "playing" });
     if (!game) {
       return res
         .status(404)
@@ -115,7 +115,7 @@ export async function makeMove(req, res) {
   if (typeof number !== "number" || isNaN(number)) {
     return res
       .status(400)
-      .json({ message: "Campo `number` é obrigatório e deve ser um número." });
+      .json({ message: "Campo number é obrigatório e deve ser um número." });
   }
 
   let row, col;
