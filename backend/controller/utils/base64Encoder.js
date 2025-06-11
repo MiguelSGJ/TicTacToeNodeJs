@@ -24,9 +24,9 @@ export async function generateBoardImage(base64Image, board) {
 
     // Coordenadas das casas (ajuste conforme sua imagem)
     const positions = [
-      { x: 270, y: 910 }, { x: 540, y: 910 }, { x: 790, y: 910 },
-      { x: 270, y: 1150 }, { x: 540, y: 1150 }, { x: 790, y: 1150 },
-      { x: 270, y: 1365 }, { x: 540, y: 1365 }, { x: 790, y: 1365 },
+      { x: 93, y: 90.0 }, { x: 158, y: 90 }, { x: 225, y: 90 },
+      { x: 93, y: 157 }, { x: 158, y: 157 }, { x: 225, y: 157 },
+      { x: 93, y: 228 }, { x: 158, y: 228 }, { x: 225, y: 228 },
     ];
 
     // Para cada posição no tabuleiro, escreve X ou O centralizado
